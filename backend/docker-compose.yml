@@ -1,26 +1,61 @@
 version: '3.8'
+
 services:
   db:
-    image: postgres:15
+    image: postgres:15-alpine
     restart: always
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: ai_copilot
+      PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   backend:
-    build: .
-    command: npm run start:dev
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    restart: always
     ports:
-      - "5000:5000"
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/ai_copilot?schema=public
+      - JWT_SECRET=your_super_secret_jwt_key_here_replace_me_in_production
+      - OPENAI_API_KEY=sk-your-openai-key-here
+      - PORT=3000
+      - REDIS_URL=redis://redis:6379
+      - NODE_ENV=development
     volumes:
       - .:/app
+      - /app/node_modules
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: npm run start:dev
 
 volumes:
-  pgdata:
+  postgres_data:
+  redis_data:

@@ -1,9 +1,14 @@
 {
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
+    "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-navigation/drawer": "^7.5.8",
     "@react-navigation/native": "^7.1.17",
+    "@react-navigation/stack": "^7.4.8",
+    "axios": "^1.11.0",
     "expo": "^53.0.22",
+    "expo-linear-gradient": "~14.1.5",
+    "expo-status-bar": "~2.2.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-native": "^0.81.1",
@@ -13,9 +18,7 @@
     "react-native-safe-area-context": "^5.6.1",
     "react-native-screens": "^4.15.4",
     "react-native-vector-icons": "^10.3.0",
-    "react-native-web": "^0.21.1",
-    "expo-status-bar": "~2.2.3",
-    "expo-linear-gradient": "~14.1.5"
+    "react-native-web": "^0.21.1"
   },
   "devDependencies": {
     "@types/react": "^19.1.12",
@@ -28,6 +31,8 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "build": "expo build",
+    "eject": "expo eject"
   }
 }

@@ -4,7 +4,7 @@ const client = new Client({ connectionString: process.env.DATABASE_URL });
 await client.connect();
 
 function chunkText(text: string, chunkSize = 1000, overlap = 200) {
-  const chunks = [];
+  const chunks: string[] = [];
   let i=0;
   while (i < text.length) {
     const start = Math.max(0, i - overlap);
@@ -22,8 +22,7 @@ async function embedAndStore(documentId, text) {
       model: 'text-embedding-3-small',
       input: c
     }, { headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` }});
-    const vector = e.data.data[0].embedding; // array of numbers
-
+    const vector = (e.data as { data: { embedding: number[] }[] }).data[0].embedding; 
     // insert via pgvector: use parameterized query casting to vector
     await client.query('INSERT INTO "DocumentChunk"(id, "documentId", content, embedding) VALUES (gen_random_uuid(), $1, $2, $3::vector)', [documentId, c, `[${vector.join(',')}]`]);
   }

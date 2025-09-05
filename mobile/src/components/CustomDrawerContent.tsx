@@ -1,11 +1,35 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
 import { DrawerContentScrollView, DrawerItemList } from "@react-navigation/drawer";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../theme/colors";
+import { useAuth } from "../hooks/useAuth";
 
 export default function CustomDrawerContent(props: any) {
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to logout. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <DrawerContentScrollView {...props} contentContainerStyle={styles.container}>
       <LinearGradient
@@ -14,10 +38,14 @@ export default function CustomDrawerContent(props: any) {
       >
         <View style={styles.headerContent}>
           <View style={styles.avatar}>
-            <Ionicons name="sparkles" size={24} color={colors.text} />
+            <Ionicons name="person" size={24} color={colors.text} />
           </View>
-          <Text style={styles.headerTitle}>AI Copilot</Text>
-          <Text style={styles.headerSubtitle}>Your intelligent assistant</Text>
+          <Text style={styles.headerTitle}>
+            {user?.name || 'AI Copilot User'}
+          </Text>
+          <Text style={styles.headerSubtitle}>
+            {user?.email || 'Your intelligent assistant'}
+          </Text>
         </View>
       </LinearGradient>
       
@@ -29,6 +57,11 @@ export default function CustomDrawerContent(props: any) {
         <TouchableOpacity style={styles.footerButton}>
           <Ionicons name="help-circle-outline" size={20} color={colors.textSecondary} />
           <Text style={styles.footerText}>Help & Support</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={20} color={colors.error} />
+          <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
       </View>
     </DrawerContentScrollView>
@@ -61,10 +94,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
     marginBottom: 4,
+    textAlign: 'center',
   },
   headerSubtitle: {
     fontSize: 14,
     color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
   },
   menuContainer: {
     flex: 1,
@@ -77,10 +112,23 @@ const styles = StyleSheet.create({
   footerButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 12,
   },
   footerText: {
     marginLeft: 12,
     color: colors.textSecondary,
     fontSize: 16,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  logoutText: {
+    marginLeft: 12,
+    color: colors.error,
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
