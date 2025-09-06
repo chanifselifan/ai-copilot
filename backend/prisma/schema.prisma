@@ -1,169 +1,15 @@
 generator client {
   provider = "prisma-client-js"
-  previewFeatures = ["postgresqlExtensions"]
-  
 }
 
 datasource db {
-  provider   = "postgresql"
-  url        = "postgresql://user:password@localhost:5432/ai_copilot"
-  extensions = [vector]
-}
-
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String
-  avatar    String?
-  role      Role     @default(USER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  notes         Note[]
-  collaborations Collaboration[]
-  messages      Message[]
-  workspaces    WorkspaceMember[]
-
-  @@map("users")
-}
-
-model Workspace {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  members WorkspaceMember[]
-  notes   Note[]
-
-  @@map("workspaces")
-}
-
-model WorkspaceMember {
-  id          String      @id @default(cuid())
-  userId      String
-  workspaceId String
-  role        MemberRole  @default(MEMBER)
-  joinedAt    DateTime    @default(now())
-
-  user      User      @relation(fields: [userId], references: [id])
-  workspace Workspace @relation(fields: [workspaceId], references: [id])
-
-  @@unique([userId, workspaceId])
-  @@map("workspace_members")
-}
-
-model Note {
-  id          String     @id @default(cuid())
-  title       String
-  content     String
-  type        NoteType   @default(TEXT)
-  status      NoteStatus @default(DRAFT)
-  authorId    String
-  workspaceId String?
-  parentId    String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-
-  author           User             @relation(fields: [authorId], references: [id])
-  workspace        Workspace?       @relation(fields: [workspaceId], references: [id])
-  parent           Note?            @relation("NoteHierarchy", fields: [parentId], references: [id])
-  children         Note[]           @relation("NoteHierarchy")
-  collaborations   Collaboration[]
-  attachments      Attachment[]
-  embeddings       NoteEmbedding[]
-  tags             NoteTag[]
-
-  @@map("notes")
-}
-
-model NoteEmbedding {
-  id       String                     @id @default(cuid())
-  noteId   String
-  content  String
-  embedding Unsupported("vector(1536)")
-  metadata Json?
-  createdAt DateTime                  @default(now())
-
-  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
-
-  @@map("note_embeddings")
-}
-
-model Attachment {
-  id       String      @id @default(cuid())
-  noteId   String
-  filename String
-  mimeType String
-  size     Int
-  url      String
-  type     AttachmentType
-  createdAt DateTime   @default(now())
-
-  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
-
-  @@map("attachments")
-}
-
-model Tag {
-  id    String @id @default(cuid())
-  name  String @unique
-  color String @default("#3b82f6")
-
-  notes NoteTag[]
-
-  @@map("tags")
-}
-
-model NoteTag {
-  noteId String
-  tagId  String
-
-  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
-  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
-
-  @@id([noteId, tagId])
-  @@map("note_tags")
-}
-
-model Collaboration {
-  id      String   @id @default(cuid())
-  noteId  String
-  userId  String
-  type    CollaborationType
-  createdAt DateTime @default(now())
-
-  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("collaborations")
-}
-
-model Message {
-  id        String      @id @default(cuid())
-  content   String
-  type      MessageType @default(TEXT)
-  authorId  String
-  channelId String
-  createdAt DateTime    @default(now())
-
-  author User @relation(fields: [authorId], references: [id])
-
-  @@map("messages")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 enum Role {
-  ADMIN
   USER
-}
-
-enum MemberRole {
-  OWNER
   ADMIN
-  MEMBER
-  VIEWER
 }
 
 enum NoteType {
@@ -179,21 +25,86 @@ enum NoteStatus {
   ARCHIVED
 }
 
-enum AttachmentType {
-  PDF
-  DOC
-  IMAGE
-  OTHER
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(USER)
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  notes         Note[]
+  collaborations Collaboration[]
 }
 
-enum CollaborationType {
-  VIEW
-  EDIT
-  COMMENT
+model Note {
+  id          String     @id @default(uuid())
+  title       String
+  content     String
+  type        NoteType   @default(TEXT)
+  status      NoteStatus @default(DRAFT)
+  authorId    String
+  workspaceId String?
+  parentId    String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relations
+  author         User              @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent         Note?             @relation("NoteHierarchy", fields: [parentId], references: [id])
+  children       Note[]            @relation("NoteHierarchy")
+  tags           NoteTag[]
+  collaborations Collaboration[]
+  attachments    Attachment[]
 }
 
-enum MessageType {
-  TEXT
-  AI_RESPONSE
-  SYSTEM
+model Tag {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String   @default("#FF6B35")
+  createdAt DateTime @default(now())
+
+  // Relations
+  notes NoteTag[]
+}
+
+model NoteTag {
+  noteId String
+  tagId  String
+
+  // Relations
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
+}
+
+model Collaboration {
+  id     String @id @default(uuid())
+  userId String
+  noteId String
+  type   String @default("VIEW") // VIEW, EDIT, ADMIN
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, noteId])
+}
+
+model Attachment {
+  id       String @id @default(uuid())
+  filename String
+  url      String
+  size     Int
+  mimeType String
+  noteId   String
+
+  // Relations
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 }
