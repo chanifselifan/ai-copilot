@@ -32,6 +32,16 @@ export interface OfflineFile {
   createdAt: string;
 }
 
+interface SyncQueueItem {
+  id: string;
+  entityType: string;
+  entityId: string;
+  operation: string;
+  data: any;
+  createdAt: string;
+  retries: number;
+}
+
 class OfflineDatabase {
   private db: SQLite.SQLiteDatabase | null = null;
 
@@ -273,25 +283,17 @@ class OfflineDatabase {
     );
   }
 
-  async getSyncQueue(): Promise<Array<{
-    id: string;
-    entityType: string;
-    entityId: string;
-    operation: string;
-    data: any;
-    createdAt: string;
-    retries: number;
-  }>> {
+  async getSyncQueue(): Promise<SyncQueueItem[]> {
     if (!this.db) throw new Error('Database not initialized');
 
-    const results = await this.db.getAllAsync(
+    const results = await this.db.getAllAsync<Omit<SyncQueueItem, 'data'> & { data: string }>(
       'SELECT * FROM sync_queue ORDER BY createdAt ASC'
     );
 
-    return results.map(row => ({
+    return results.map((row: any) => ({
       ...row,
-      data: JSON.parse(row.data as string),
-    })) as any;
+      data: JSON.parse(row.data),
+    }));
   }
 
   async removeSyncQueueItem(id: string): Promise<void> {
@@ -333,6 +335,8 @@ class OfflineDatabase {
           [status, entityId]
         );
         break;
+      default:
+        throw new Error(`Unknown entity type: ${entityType}`);
     }
   }
 
@@ -358,6 +362,84 @@ class OfflineDatabase {
           ['PENDING', 'SYNCED']
         );
         break;
+      default:
+        throw new Error(`Unknown entity type: ${entityType}`);
+    }
+  }
+
+  // Advanced sync operations
+  async getConflictItems(): Promise<{
+    notes: OfflineNote[];
+    messages: OfflineMessage[];
+    files: OfflineFile[];
+  }> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const notes = await this.db.getAllAsync<OfflineNote>(
+      'SELECT * FROM notes WHERE syncStatus = ? ORDER BY updatedAt DESC',
+      ['CONFLICT']
+    );
+
+    const messages = await this.db.getAllAsync<OfflineMessage>(
+      'SELECT * FROM messages WHERE syncStatus = ? ORDER BY timestamp DESC',
+      ['CONFLICT']
+    );
+
+    const files = await this.db.getAllAsync<OfflineFile>(
+      'SELECT * FROM files WHERE syncStatus = ? ORDER BY createdAt DESC',
+      ['CONFLICT']
+    );
+
+    return { notes, messages, files };
+  }
+
+  async resolveConflict(entityType: string, entityId: string, resolution: 'local' | 'remote'): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    if (resolution === 'local') {
+      await this.updateSyncStatus(entityType, entityId, 'PENDING');
+    } else {
+      await this.updateSyncStatus(entityType, entityId, 'SYNCED');
+    }
+  }
+
+  // Batch operations for better performance
+  async batchUpdateSyncStatus(updates: Array<{
+    entityType: string;
+    entityId: string;
+    status: 'PENDING' | 'SYNCED' | 'CONFLICT';
+  }>): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const now = new Date().toISOString();
+
+    // Group by entity type for efficient updates
+    const noteUpdates = updates.filter(u => u.entityType === 'note');
+    const messageUpdates = updates.filter(u => u.entityType === 'message');
+    const fileUpdates = updates.filter(u => u.entityType === 'file');
+
+    // Batch update notes
+    for (const update of noteUpdates) {
+      await this.db.runAsync(
+        'UPDATE notes SET syncStatus = ?, lastSyncAt = ? WHERE id = ?',
+        [update.status, now, update.entityId]
+      );
+    }
+
+    // Batch update messages
+    for (const update of messageUpdates) {
+      await this.db.runAsync(
+        'UPDATE messages SET syncStatus = ? WHERE id = ?',
+        [update.status, update.entityId]
+      );
+    }
+
+    // Batch update files
+    for (const update of fileUpdates) {
+      await this.db.runAsync(
+        'UPDATE files SET syncStatus = ? WHERE id = ?',
+        [update.status, update.entityId]
+      );
     }
   }
 
@@ -405,6 +487,23 @@ class OfflineDatabase {
       [`%${query}%`, `%${query}%`]
     );
 
+    return results;
+  }
+
+  async searchMessages(query: string, conversationId?: string): Promise<OfflineMessage[]> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    let sql = 'SELECT * FROM messages WHERE text LIKE ?';
+    const params: any[] = [`%${query}%`];
+
+    if (conversationId) {
+      sql += ' AND conversationId = ?';
+      params.push(conversationId);
+    }
+
+    sql += ' ORDER BY timestamp DESC';
+
+    const results = await this.db.getAllAsync<OfflineMessage>(sql, params);
     return results;
   }
 
@@ -494,11 +593,111 @@ class OfflineDatabase {
     return result?.lastSync || null;
   }
 
+  // Additional file operations
+  async updateFileStatus(id: string, status: 'PENDING' | 'SYNCED' | 'UPLOADING', serverId?: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const params: any[] = [status, id];
+    let sql = 'UPDATE files SET syncStatus = ?';
+
+    if (serverId) {
+      sql += ', serverId = ?';
+      params.splice(1, 0, serverId);
+    }
+
+    sql += ' WHERE id = ?';
+
+    await this.db.runAsync(sql, params);
+  }
+
+  async getFileById(id: string): Promise<OfflineFile | null> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const result = await this.db.getFirstAsync<OfflineFile>(
+      'SELECT * FROM files WHERE id = ?',
+      [id]
+    );
+
+    return result || null;
+  }
+
+  async deleteFile(id: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    await this.db.runAsync('DELETE FROM files WHERE id = ?', [id]);
+    await this.addToSyncQueue('file', id, 'DELETE', { id });
+  }
+
+  // Message operations extensions
+  async updateMessage(id: string, text: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    await this.db.runAsync(
+      'UPDATE messages SET text = ?, syncStatus = ? WHERE id = ?',
+      [text, 'PENDING', id]
+    );
+
+    const message = await this.getMessageById(id);
+    if (message) {
+      await this.addToSyncQueue('message', id, 'UPDATE', message);
+    }
+  }
+
+  async getMessageById(id: string): Promise<OfflineMessage | null> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const result = await this.db.getFirstAsync<OfflineMessage>(
+      'SELECT * FROM messages WHERE id = ?',
+      [id]
+    );
+
+    return result || null;
+  }
+
+  async deleteMessage(id: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    await this.db.runAsync('DELETE FROM messages WHERE id = ?', [id]);
+    await this.addToSyncQueue('message', id, 'DELETE', { id });
+  }
+
+  async getConversationsList(): Promise<Array<{ conversationId: string; messageCount: number; lastMessage: string; lastTimestamp: string }>> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const results = await this.db.getAllAsync<{
+      conversationId: string;
+      messageCount: number;
+      lastMessage: string;
+      lastTimestamp: string;
+    }>(
+      `SELECT 
+        conversationId,
+        COUNT(*) as messageCount,
+        MAX(text) as lastMessage,
+        MAX(timestamp) as lastTimestamp
+       FROM messages 
+       GROUP BY conversationId 
+       ORDER BY MAX(timestamp) DESC`
+    );
+
+    return results;
+  }
+
   // Database maintenance
   async vacuum(): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
     
     await this.db.execAsync('VACUUM;');
+  }
+
+  async getDatabaseSize(): Promise<number> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const result = await this.db.getFirstAsync<{ page_count: number; page_size: number }>(
+      'PRAGMA page_count; PRAGMA page_size;'
+    );
+
+    return (result?.page_count || 0) * (result?.page_size || 0);
   }
 
   async close(): Promise<void> {

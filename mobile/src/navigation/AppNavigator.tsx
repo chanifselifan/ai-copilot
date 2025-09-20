@@ -8,13 +8,13 @@ import { createStackNavigator } from "@react-navigation/stack";
 import { Ionicons } from "@expo/vector-icons";
 import { View, ActivityIndicator, Text } from "react-native";
 
-import ChatScreen from "../screens/ChatScreen.js";
-import NotesScreen from "../screens/NotesScreen.js";
-import SettingsScreen from "../screens/SettingsScreen.js";
-import AuthScreen from "../screens/AuthScreens.js";
-import CustomDrawerContent from "../components/CustomDrawerContent.js";
-import { useAuth } from "../contexts/AuthContext.js";
-import { colors } from "../theme/colors.js";
+import ChatScreen from "../screens/ChatScreen";
+import NotesScreen from "../screens/NotesScreen";
+import SettingsScreen from "../screens/SettingsScreen";
+import AuthScreen from "../screens/AuthScreens";
+import CustomDrawerContent from "../components/CustomDrawerContent";
+import { useAuth } from "../contexts/AuthContext";
+import { colors } from "../theme/colors";
 
 // Drawer & Stack
 const Drawer = createDrawerNavigator();

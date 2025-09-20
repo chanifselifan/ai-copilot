@@ -13,9 +13,9 @@ import {
   RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import  {colors}  from "../theme/colors.js";
-import notesService, { BackendNote, CreateNoteRequest, UpdateNoteRequest } from "../services/notesService.js";
-import aiService from "../services/aiServise.js";
+import  {colors}  from "../theme/colors";
+import notesService, { BackendNote, CreateNoteRequest, UpdateNoteRequest } from "../services/notesService";
+import aiService from "../services/aiServise";
 
 export default function NotesScreen() {
   const [notes, setNotes] = useState<BackendNote[]>([]);

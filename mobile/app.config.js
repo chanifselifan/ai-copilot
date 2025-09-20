@@ -1,35 +1,38 @@
+// app.config.js
 export default {
   expo: {
-    name: "ai-copilot-mobile",
-    slug: "ai-copilot-mobile", 
+    name: "AI Copilot Mobile",
+    slug: "ai-copilot-mobile",
     version: "1.0.0",
-    platforms: ["ios", "android"],
     orientation: "portrait",
     icon: "./assets/icon.png",
+    userInterfaceStyle: "dark",
     splash: {
       image: "./assets/splash.png",
       resizeMode: "contain",
       backgroundColor: "#0F0F0F"
     },
-    updates: {
-      fallbackToCacheTimeout: 0
-    },
     assetBundlePatterns: [
       "**/*"
     ],
     ios: {
-      supportsTablet: true
+      supportsTablet: true,
+      bundleIdentifier: "com.anonymous.mobile",
+      scheme: "ai-copilot-mobile"
     },
     android: {
       package: "com.anonymous.mobile",
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#0F0F0F"
-      }
+      },
+      scheme: "ai-copilot-mobile"
+    },
+    web: {
+      favicon: "./assets/favicon.png"
     },
     plugins: [
-      "expo-dev-client",
-      "expo-sqlite"
+      "expo-router"
     ]
   }
 };

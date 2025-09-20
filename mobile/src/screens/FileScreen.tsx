@@ -15,7 +15,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from 'expo-document-picker';
 import { colors } from "../theme/colors";
-import fileService, { UploadedFile, FileQueryResponse } from "../services/fileService";
+// Fixed import - create the fileService file or update the path
+import fileService, { UploadedFile, FileQueryResponse } from "../services/fileServices";
 
 export default function FilesScreen() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -90,7 +91,7 @@ export default function FilesScreen() {
         file.mimeType || 'application/octet-stream'
       );
 
-      setFiles(prev => [uploadResponse.file, ...prev]);
+      setFiles(prev => [uploadResponse.file, ...prev] as UploadedFile[]);
       Alert.alert('Success', 'File uploaded successfully!');
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to upload file');
@@ -111,7 +112,7 @@ export default function FilesScreen() {
           onPress: async () => {
             try {
               await fileService.deleteFile(file.id);
-              setFiles(prev => prev.filter(f => f.id !== file.id));
+              setFiles(prev => prev.filter(f => f.id !== file.id) as UploadedFile[]);
               Alert.alert('Success', 'File deleted successfully');
             } catch (error: any) {
               Alert.alert('Error', error.message || 'Failed to delete file');
@@ -161,7 +162,7 @@ export default function FilesScreen() {
         <View style={styles.fileHeader}>
           <View style={styles.fileIconContainer}>
             <Ionicons 
-              name={fileService.getFileIcon(item.mimeType)} 
+              name={fileService.getFileIcon(item.mimeType) as any} 
               size={24} 
               color={colors.primary} 
             />
@@ -298,7 +299,7 @@ export default function FilesScreen() {
             {selectedFile && (
               <View style={styles.filePreview}>
                 <Ionicons 
-                  name={fileService.getFileIcon(selectedFile.mimeType)} 
+                  name={fileService.getFileIcon(selectedFile.mimeType) as any} 
                   size={20} 
                   color={colors.primary} 
                 />
@@ -329,7 +330,7 @@ export default function FilesScreen() {
                 {queryResult.relevantChunks && queryResult.relevantChunks.length > 0 && (
                   <View style={styles.chunksContainer}>
                     <Text style={styles.chunksLabel}>Relevant sections:</Text>
-                    {queryResult.relevantChunks.slice(0, 2).map((chunk, index) => (
+                    {queryResult.relevantChunks.slice(0, 2).map((chunk: { text: string; page?: number }, index: number) => (
                       <View key={index} style={styles.chunkItem}>
                         <Text style={styles.chunkText} numberOfLines={3}>
                           {chunk.text}
